@@ -1,0 +1,307 @@
+
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistem Minit Curai PK19/6</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      body { font-family: 'Inter', sans-serif; }
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      .animate-in { animation: fadeIn 0.3s ease-out; }
+      .loader { border-top-color: #d97706; animation: spinner 1.5s linear infinite; }
+      @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      .logo-blend { mix-blend-mode: multiply; }
+    </style>
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom": "https://esm.sh/react-dom@18.2.0",
+        "lucide-react": "https://esm.sh/lucide-react@0.263.1",
+        "jspdf": "https://esm.sh/jspdf@2.5.1",
+        "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.5.28"
+      }
+    }
+    </script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-orange-50 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState } from 'react';
+        import ReactDOM from 'react-dom';
+        import { Plus, Trash2, FileText, UploadCloud, User, Calendar, Clock, MapPin, Building, Hash, ClipboardList, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+        import { jsPDF } from 'jspdf';
+        import autoTable from 'jspdf-autotable';
+
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbyM43TxNqnzI_9sI6qE5c5b2Fb_igTktbYE9K_4LYotTzNpi3s-D-J-EnwD87oceoIW/exec"; 
+
+        const generatePDF = (data, outputType = 'base64') => {
+            const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const margin = 15;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const contentWidth = pageWidth - (margin * 2);
+            
+            doc.setFont('Helvetica', 'normal').setFontSize(8);
+            doc.text('PK19 – Pengurusan Sukan Dan Permainan', pageWidth - margin, 10, { align: 'right' });
+            doc.line(margin, 12, pageWidth - margin, 12);
+            doc.setFont('Helvetica', 'bold').setFontSize(11);
+            doc.text('PK19/6', pageWidth - margin, 18, { align: 'right' });
+            doc.setFontSize(12).text('MINIT CURAI', pageWidth / 2, 25, { align: 'center' });
+
+            const gridStartY = 30;
+            const rowHeight = 7;
+            const colWidth = contentWidth / 2;
+            doc.setFontSize(10).setFont('Helvetica', 'normal');
+
+            const drawRow = (y, l1, v1, l2, v2) => {
+                doc.rect(margin, y, colWidth, rowHeight);
+                doc.setFont('Helvetica', 'bold').text(l1, margin + 2, y + 5);
+                doc.setFont('Helvetica', 'normal').text(v1 || '', margin + 25, y + 5);
+                doc.rect(margin + colWidth, y, colWidth, rowHeight);
+                doc.setFont('Helvetica', 'bold').text(l2, margin + colWidth + 2, y + 5);
+                doc.setFont('Helvetica', 'normal').text(v2 || '', margin + colWidth + 25, y + 5);
+            };
+
+            const formatDate = (dStr) => {
+                if (!dStr) return '';
+                const d = new Date(dStr);
+                return d.toLocaleDateString('ms-MY', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            };
+
+            drawRow(gridStartY, 'PERKARA', data.perkara, 'TARIKH', formatDate(data.tarikh));
+            drawRow(gridStartY + rowHeight, 'RUJ. FAIL', data.rujukanFail, 'MASA', `${data.masaMula} - ${data.masaTamat}`);
+            drawRow(gridStartY + (rowHeight * 2), 'TEMPAT', data.tempat, 'ANJURAN', data.anjuran);
+
+            const attY = gridStartY + (rowHeight * 3);
+            doc.rect(margin, attY, contentWidth, rowHeight * 2);
+            doc.setFont('Helvetica', 'bold').text('KEHADIRAN :', margin + 2, attY + 5);
+            doc.setFont('Helvetica', 'normal').text('', margin + 30, attY + 5);
+
+            autoTable(doc, {
+                startY: attY + (rowHeight * 2),
+                margin: { left: margin, right: margin },
+                head: [['BIL', 'PERKARA / ISU', 'TINDAKAN / MAKLUMAN']],
+                body: data.issues.map((iss, i) => [(i + 1).toString(), iss.perkara, iss.tindakan]),
+                theme: 'plain',
+                styles: { font: 'Helvetica', fontSize: 10, cellPadding: 3, lineColor: [0,0,0], lineWidth: 0.1 },
+                headStyles: { fontStyle: 'bold', halign: 'center' },
+                columnStyles: { 0: { cellWidth: 12, halign: 'center' }, 1: { cellWidth: (contentWidth - 12) * 0.7 }, 2: { cellWidth: (contentWidth - 12) * 0.3 } },
+            });
+
+            const finalY = doc.lastAutoTable.finalY + 5;
+            doc.rect(margin, finalY, colWidth, 15);
+            doc.setFont('Helvetica', 'normal').text('Nama Pencatat :', margin + 2, finalY + 5);
+            doc.setFont('Helvetica', 'bold').text(data.pencatat || '', margin + 2, finalY + 11);
+
+            doc.rect(margin + colWidth, finalY, colWidth, 15);
+            doc.setFont('Helvetica', 'normal').text('Tarikh Disediakan :', margin + colWidth + 2, finalY + 5);
+            doc.setFont('Helvetica', 'bold').text(formatDate(data.tarikhDisediakan) || '', margin + colWidth + 2, finalY + 11);
+
+            const ph = doc.internal.pageSize.getHeight();
+            doc.setFontSize(7).setFont('Helvetica', 'normal');
+            doc.line(margin, ph - 20, pageWidth - margin, ph - 20);
+            doc.text('Hak Cipta Terpelihara © Sektor Jaminan Kualiti, Jabatan Pendidikan Negeri Johor', margin, ph - 15);
+            doc.text('01 Januari 2018 - Keluaran 01 | Pindaan 00', margin, ph - 11);
+
+            if (outputType === 'base64') {
+                return doc.output('datauristring').split(',')[1];
+            }
+        };
+
+        const FormField = ({ label, icon, children }) => (
+            <div className="flex flex-col gap-2">
+                <label className="text-sm font-semibold text-amber-700 flex items-center gap-2">
+                    {icon} {label}
+                </label>
+                {children}
+            </div>
+        );
+
+        const App = () => {
+            const getToday = () => new Date().toISOString().split('T')[0];
+            const getTomorrow = () => new Date(new Date().getTime() + 86400000).toISOString().split('T')[0];
+
+            const initialData = {
+                perkara: '',
+                tarikh: getToday(),
+                rujukanFail: '-',
+                masaMula: '08:00',
+                masaTamat: '11:00',
+                tempat: '',
+                anjuran: '',
+                kehadiran: '',
+                pencatat: '',
+                tarikhDisediakan: getTomorrow(),
+                issues: [{ id: Math.random().toString(), perkara: '', tindakan: '' }]
+            };
+
+            const [data, setData] = useState(initialData);
+            const [loading, setLoading] = useState(false);
+            const [isSent, setIsSent] = useState(false);
+            const [status, setStatus] = useState(null);
+
+            const handleInputChange = (e) => {
+                const { name, value } = e.target;
+                if (name === 'tarikh') {
+                    const nextDay = new Date(new Date(value).getTime() + 86400000).toISOString().split('T')[0];
+                    setData(prev => ({ ...prev, tarikh: value, tarikhDisediakan: nextDay }));
+                } else if (name === 'masaMula') {
+                    const [h, m] = value.split(':').map(Number);
+                    const d = new Date(); d.setHours(h + 3, m);
+                    const newT = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                    setData(prev => ({ ...prev, masaMula: value, masaTamat: newT }));
+                } else {
+                    setData(prev => ({ ...prev, [name]: value }));
+                }
+            };
+
+            const addIssue = () => setData(prev => ({ ...prev, issues: [...prev.issues, { id: Math.random().toString(), perkara: '', tindakan: '' }] }));
+            const removeIssue = (id) => data.issues.length > 1 && setData(prev => ({ ...prev, issues: prev.issues.filter(i => i.id !== id) }));
+            const updateIssue = (id, f, v) => setData(prev => ({ ...prev, issues: prev.issues.map(i => i.id === id ? { ...i, [f]: v } : i) }));
+
+            const handleReset = () => {
+                setData(initialData);
+                setIsSent(false);
+                setStatus(null);
+                setLoading(false);
+            };
+
+            const handleJanaPDF = async () => {
+                if (!data.perkara || !data.pencatat) {
+                    setStatus({ type: 'error', message: 'Sila lengkapkan Nama dan Perkara sebelum menjana rekod.' });
+                    return;
+                }
+
+                setLoading(true);
+                setStatus({ type: 'info', message: 'Minit Curai sedang dihantar ke Google Drive...' });
+
+                try {
+                    const pdfBase64 = generatePDF(data, 'base64');
+                    const filename = `Minit_Curai_${data.perkara.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+                    
+                    await fetch(GAS_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: JSON.stringify({
+                            pdfData: pdfBase64,
+                            fileName: filename
+                        })
+                    });
+
+                    setStatus({ type: 'success', message: 'Minit Curai berjaya disimpan ke folder Google Drive!' });
+                    setIsSent(true);
+                } catch (err) {
+                    console.error(err);
+                    setStatus({ type: 'error', message: 'Gagal menghantar ke Drive. Sila semak sambungan internet anda.' });
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="max-w-4xl mx-auto py-10 px-4">
+                    <header className="mb-10 text-center">
+                        <img 
+                            src="https://i.postimg.cc/LXs7gmYk/logo-sekolah.jpg" 
+                            alt="Logo Sekolah" 
+                            className="mx-auto h-32 w-auto mb-6 drop-shadow-md logo-blend"
+                        />
+                        <h1 className="text-3xl font-bold text-amber-900">Sistem Penjana Minit Curai</h1>
+                    </header>
+
+                    {status && (
+                        <div className={`mb-6 p-4 rounded-xl flex items-center gap-3 animate-in shadow-sm border ${
+                            status.type === 'success' ? 'bg-green-100 text-green-800 border-green-200' : 
+                            status.type === 'info' ? 'bg-amber-100 text-amber-800 border-amber-200' :
+                            'bg-red-100 text-red-800 border-red-200'
+                        }`}>
+                            {status.type === 'success' ? <CheckCircle className="flex-shrink-0" /> : status.type === 'info' ? <RefreshCw className="flex-shrink-0 animate-spin" /> : <AlertCircle className="flex-shrink-0" />}
+                            <span className="font-medium">{status.message}</span>
+                        </div>
+                    )}
+
+                    <main className="bg-white rounded-2xl shadow-xl border border-amber-100 overflow-hidden">
+                        <div className="p-8 bg-gradient-to-br from-amber-50 to-white border-b border-amber-100">
+                            <h2 className="text-lg font-semibold text-amber-800 mb-6 flex items-center gap-2"><ClipboardList className="w-5 h-5" /> Maklumat Utama</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="md:col-span-2">
+                                    <FormField label="Nama" icon={<User size={18} />}>
+                                        <input type="text" name="pencatat" value={data.pencatat} onChange={handleInputChange} className="w-full px-4 py-2 rounded-lg border border-amber-200 focus:ring-2 focus:ring-amber-400 outline-none" placeholder="Nama anda" />
+                                    </FormField>
+                                </div>
+                                <FormField label="Perkara" icon={<FileText size={18} />}><input type="text" name="perkara" value={data.perkara} onChange={handleInputChange} className="w-full px-4 py-2 rounded-lg border border-amber-200 focus:ring-2 focus:ring-amber-400 outline-none" placeholder="Tajuk acara" /></FormField>
+                                <FormField label="Tarikh" icon={<Calendar size={18} />}><input type="date" name="tarikh" value={data.tarikh} onChange={handleInputChange} className="w-full px-4 py-2 rounded-lg border border-amber-200 focus:ring-2 focus:ring-amber-400 outline-none" /></FormField>
+                                <FormField label="Rujukan Fail" icon={<Hash size={18} />}><input type="text" name="rujukanFail" value={data.rujukanFail} onChange={handleInputChange} className="w-full px-4 py-2 rounded-lg border border-amber-200 focus:ring-2 focus:ring-amber-400 outline-none" /></FormField>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <FormField label="Masa Mula" icon={<Clock size={18} />}><input type="time" name="masaMula" value={data.masaMula} onChange={handleInputChange} className="w-full px-4 py-2 rounded-lg border border-amber-200 focus:ring-2 focus:ring-amber-400 outline-none" /></FormField>
+                                    <FormField label="Masa Tamat" icon={<Clock size={18} />}><input type="time" name="masaTamat" value={data.masaTamat} onChange={handleInputChange} className="w-full px-4 py-2 rounded-lg border border-amber-200 focus:ring-2 focus:ring-amber-400 outline-none" /></FormField>
+                                </div>
+                                <FormField label="Tempat" icon={<MapPin size={18} />}><input type="text" name="tempat" value={data.tempat} onChange={handleInputChange} className="w-full px-4 py-2 rounded-lg border border-amber-200 focus:ring-2 focus:ring-amber-400 outline-none" /></FormField>
+                                <FormField label="Anjuran" icon={<Building size={18} />}><input type="text" name="anjuran" value={data.anjuran} onChange={handleInputChange} className="w-full px-4 py-2 rounded-lg border border-amber-200 focus:ring-2 focus:ring-amber-400 outline-none" /></FormField>
+                            </div>
+                        </div>
+
+                        <div className="p-8">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-lg font-semibold text-amber-800">Perkara / Isu dan Tindakan</h2>
+                                <button onClick={addIssue} className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm"><Plus size={18} /> Tambah Isu</button>
+                            </div>
+                            <div className="space-y-4">
+                                {data.issues.map((iss, idx) => (
+                                    <div key={iss.id} className="group relative flex flex-col md:flex-row gap-4 p-4 rounded-xl border border-amber-100 bg-amber-50/30 hover:bg-amber-50/50 transition-colors">
+                                        <div className="w-8 h-8 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center font-bold flex-shrink-0">{idx + 1}</div>
+                                        <div className="flex-grow space-y-3">
+                                            <textarea value={iss.perkara} onChange={(e) => updateIssue(iss.id, 'perkara', e.target.value)} placeholder="Perkara / Isu" className="w-full px-3 py-2 rounded-lg border border-amber-200 focus:ring-2 focus:ring-amber-400 outline-none min-h-[60px]" />
+                                            <textarea value={iss.tindakan} onChange={(e) => updateIssue(iss.id, 'tindakan', e.target.value)} placeholder="Tindakan / Makluman (Kosongkan jika tiada)" className="w-full px-3 py-2 rounded-lg border border-amber-200 focus:ring-2 focus:ring-amber-400 outline-none min-h-[60px]" />
+                                        </div>
+                                        <button onClick={() => removeIssue(iss.id)} className="p-2 text-red-400 hover:text-red-600 transition-colors self-start md:self-center"><Trash2 size={20} /></button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="p-8 border-t border-amber-100 bg-amber-50/20 text-center flex justify-center items-center">
+                            {!isSent ? (
+                                <button 
+                                    onClick={handleJanaPDF} 
+                                    disabled={loading}
+                                    className="flex items-center gap-3 px-12 py-5 bg-amber-600 text-white rounded-2xl font-bold text-lg hover:bg-amber-700 transition-all shadow-xl shadow-amber-200 disabled:opacity-50 transform active:scale-95"
+                                >
+                                    {loading ? (
+                                        <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    ) : (
+                                        <UploadCloud size={24} />
+                                    )}
+                                    Jana PDF
+                                </button>
+                            ) : (
+                                <button 
+                                    onClick={handleReset} 
+                                    className="flex items-center gap-3 px-12 py-5 bg-emerald-600 text-white rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 transform active:scale-95 animate-in"
+                                >
+                                    <Plus size={24} />
+                                    Tambah Rekod Baru
+                                </button>
+                            )}
+                        </div>
+                    </main>
+                    
+                    <footer className="mt-10 text-center text-amber-700/60 text-sm">
+                        <p>Rekod dihantar secara automatik ke Google Drive</p>
+                        <p>Hak Cipta Terpelihara &copy; {new Date().getFullYear()} - Format PK19/6</p>
+                    </footer>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
