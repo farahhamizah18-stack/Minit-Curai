@@ -27,7 +27,6 @@
       }
     }
     </script>
-<link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-orange-50 min-h-screen">
     <div id="root"></div>
@@ -60,12 +59,19 @@
             doc.setFontSize(10).setFont('Helvetica', 'normal');
 
             const drawRow = (y, l1, v1, l2, v2) => {
-                doc.rect(margin, y, colWidth, rowHeight);
+                const maxValWidth = colWidth - 28;
+                const lines1 = doc.splitTextToSize(v1 || '', maxValWidth);
+                const lines2 = doc.splitTextToSize(v2 || '', maxValWidth);
+                const h = Math.max(rowHeight, (Math.max(lines1.length, lines2.length) * 4.5) + 2);
+
+                doc.rect(margin, y, colWidth, h);
                 doc.setFont('Helvetica', 'bold').text(l1, margin + 2, y + 5);
-                doc.setFont('Helvetica', 'normal').text(v1 || '', margin + 25, y + 5);
-                doc.rect(margin + colWidth, y, colWidth, rowHeight);
+                doc.setFont('Helvetica', 'normal').text(lines1, margin + 25, y + 5);
+                
+                doc.rect(margin + colWidth, y, colWidth, h);
                 doc.setFont('Helvetica', 'bold').text(l2, margin + colWidth + 2, y + 5);
-                doc.setFont('Helvetica', 'normal').text(v2 || '', margin + colWidth + 25, y + 5);
+                doc.setFont('Helvetica', 'normal').text(lines2, margin + colWidth + 25, y + 5);
+                return h;
             };
 
             const formatDate = (dStr) => {
@@ -74,11 +80,12 @@
                 return d.toLocaleDateString('ms-MY', { day: '2-digit', month: '2-digit', year: 'numeric' });
             };
 
-            drawRow(gridStartY, 'PERKARA', data.perkara, 'TARIKH', formatDate(data.tarikh));
-            drawRow(gridStartY + rowHeight, 'RUJ. FAIL', data.rujukanFail, 'MASA', `${data.masaMula} - ${data.masaTamat}`);
-            drawRow(gridStartY + (rowHeight * 2), 'TEMPAT', data.tempat, 'ANJURAN', data.anjuran);
+            let currentY = gridStartY;
+            currentY += drawRow(currentY, 'PERKARA', data.perkara, 'TARIKH', formatDate(data.tarikh));
+            currentY += drawRow(currentY, 'RUJ. FAIL', data.rujukanFail, 'MASA', `${data.masaMula} - ${data.masaTamat}`);
+            currentY += drawRow(currentY, 'TEMPAT', data.tempat, 'ANJURAN', data.anjuran);
 
-            const attY = gridStartY + (rowHeight * 3);
+            const attY = currentY;
             doc.rect(margin, attY, contentWidth, rowHeight * 2);
             doc.setFont('Helvetica', 'bold').text('KEHADIRAN :', margin + 2, attY + 5);
             doc.setFont('Helvetica', 'normal').text('', margin + 30, attY + 5);
@@ -112,6 +119,7 @@
             if (outputType === 'base64') {
                 return doc.output('datauristring').split(',')[1];
             }
+            return doc;
         };
 
         const FormField = ({ label, icon, children }) => (
@@ -172,9 +180,19 @@
                 setLoading(false);
             };
 
-            const handleJanaPDF = async () => {
+            const handleJanaPDF = () => {
                 if (!data.perkara || !data.pencatat) {
-                    setStatus({ type: 'error', message: 'Sila lengkapkan Nama dan Perkara sebelum menjana rekod.' });
+                    setStatus({ type: 'error', message: 'Sila lengkapkan Nama dan Perkara sebelum menjana PDF.' });
+                    return;
+                }
+                const doc = generatePDF(data, 'doc');
+                const filename = `Minit_Curai_${data.perkara.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+                doc.save(filename);
+            };
+
+            const handleHantarDrive = async () => {
+                if (!data.perkara || !data.pencatat) {
+                    setStatus({ type: 'error', message: 'Sila lengkapkan Nama dan Perkara sebelum menghantar.' });
                     return;
                 }
 
@@ -266,20 +284,29 @@
                             </div>
                         </div>
 
-                        <div className="p-8 border-t border-amber-100 bg-amber-50/20 text-center flex justify-center items-center">
+                        <div className="p-8 border-t border-amber-100 bg-amber-50/20 text-center flex flex-col md:flex-row justify-center items-center gap-4">
                             {!isSent ? (
-                                <button 
-                                    onClick={handleJanaPDF} 
-                                    disabled={loading}
-                                    className="flex items-center gap-3 px-12 py-5 bg-amber-600 text-white rounded-2xl font-bold text-lg hover:bg-amber-700 transition-all shadow-xl shadow-amber-200 disabled:opacity-50 transform active:scale-95"
-                                >
-                                    {loading ? (
-                                        <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
-                                    ) : (
-                                        <UploadCloud size={24} />
-                                    )}
-                                    Jana PDF
-                                </button>
+                                <>
+                                    <button 
+                                        onClick={handleJanaPDF} 
+                                        className="flex items-center gap-3 px-10 py-4 bg-amber-600 text-white rounded-2xl font-bold text-lg hover:bg-amber-700 transition-all shadow-xl shadow-amber-200 transform active:scale-95"
+                                    >
+                                        <FileText size={24} />
+                                        Jana PDF
+                                    </button>
+                                    <button 
+                                        onClick={handleHantarDrive} 
+                                        disabled={loading}
+                                        className="flex items-center gap-3 px-10 py-4 bg-emerald-600 text-white rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 disabled:opacity-50 transform active:scale-95"
+                                    >
+                                        {loading ? (
+                                            <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        ) : (
+                                            <UploadCloud size={24} />
+                                        )}
+                                        Hantar ke Drive
+                                    </button>
+                                </>
                             ) : (
                                 <button 
                                     onClick={handleReset} 
@@ -293,7 +320,7 @@
                     </main>
                     
                     <footer className="mt-10 text-center text-amber-700/60 text-sm">
-                        <p>Rekod dihantar secara automatik ke Google Drive</p>
+                        <p>Rekod boleh dijana sebagai PDF atau dihantar ke Google Drive</p>
                         <p>Hak Cipta Terpelihara &copy; {new Date().getFullYear()} - Format PK19/6</p>
                     </footer>
                 </div>
@@ -302,6 +329,5 @@
 
         ReactDOM.render(<App />, document.getElementById('root'));
     </script>
-<script type="module" src="/index.tsx"></script>
 </body>
 </html>
